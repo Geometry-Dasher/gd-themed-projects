@@ -5,43 +5,65 @@ icon cube;
 g ground;
 ArrayList<spike> spikes;
 
+float physicsInterval = 1.0 / 240.0; 
+float accumulator = 0.0;
+float currentTime = 0.0;
+
 void setup() {
-  size(1920,1080);
-  background(100,100,100);
-  cube = new icon (350,667,100,100);
-  ground = new g (0,2*height/3,width,height/3);
+  size(1920, 1080);
+  background(100, 100, 100);
+  
+  currentTime = millis() / 1000.0;
+  
+  cube = new icon(350, 667, 100, 100);
+  ground = new g(0, 2*height/3, width, height/3);
   spikes = new ArrayList<spike>();
-  spikes.add(new spike(2000,667,100,100));
-  spikes.add(new spike(2100,667,100,100));
-  spikes.add(new spike(2200,667,100,100));
+  spikes.add(new spike(2000, 667, 100, 100));
+  spikes.add(new spike(2100, 667, 100, 100));
+  spikes.add(new spike(2200, 667, 100, 100));
 }
 
-
 void draw() {
+  float newTime = millis() / 1000.0;
+  float frameTime = newTime - currentTime;
+  currentTime = newTime;
+
+  if (frameTime > 0.1) frameTime = 0.1; 
+  accumulator += frameTime;
+
+  while (accumulator >= physicsInterval) {
+    updateGamePhysics(physicsInterval);
+    accumulator -= physicsInterval;
+  }
+
   background(100, 100, 100); 
   ground.display();
   cube.display();
+  for (spike s : spikes) {
+    s.display();
+  }
+}
+
+void updateGamePhysics(float dt) {
   if (!gameEnd) {
-    cube.update(); 
+    cube.update(dt); 
     for (spike s : spikes) {
-      s.update();
+      s.update(dt);
+      if (s.collides(cube)) {
+        gameEnd = true;
+      }
     }
   } else {
-    respawn --;
-    if (respawn == 0) {
+    respawn--;
+    if (respawn <= 0) {
       gameEnd = false;
       respawn = 60;
       cube.angle = 0;
       cube.ypos = 667;
+      cube.ySpeed = 0;
       for (spike s : spikes) {
         s.xpos = s.origin;
       }
-    }
-  }
-  for (spike s : spikes) {
-    s.display();
-    if (s.collides(cube)) {
-      gameEnd = true;
     }
   }
 }
@@ -53,16 +75,13 @@ void mousePressed() {
 class g {
   float xpos, ypos, w, h;
   g (float x, float y, float w, float h) {
-    this.xpos = x;
-    this.ypos = y;
-    this.w = w;
-    this.h = h;
+    this.xpos = x; this.ypos = y; this.w = w; this.h = h;
   }
   void display() {
     rectMode(CORNER);
     noStroke();
-    fill(255,255,255);
-    rect(xpos,ypos,w,h);
+    fill(255);
+    rect(xpos, ypos, w, h);
   }
 }
 
@@ -70,25 +89,24 @@ class icon {
   float ySpeed = 0;
   float xpos, ypos, w, h;
   float angle = 0; 
-  float gravity = 2;
+  
+  float gravity = 4500; 
+  float jumpVelocity = 1400; 
 
   icon(float x, float y, float w, float h) {
-    this.xpos = x;
-    this.ypos = y;
-    this.w = w;
-    this.h = h;
+    this.xpos = x; this.ypos = y; this.w = w; this.h = h;
   }
 
-  void update() {
-    ySpeed -= gravity;
-    ypos -= ySpeed;
+  void update(float dt) {
+    ySpeed -= gravity * dt;
+    ypos -= ySpeed * dt;
 
-    if (ypos + h/2 >= height*2/3) {
-      ypos = height*2/3 - h/2;
+    if (ypos >= 720 - h/2) {
+      ypos = 720 - h/2;
       ySpeed = 0;
-      angle = 0; 
+      angle = round(angle / PI) * PI; 
     } else {
-      angle += 0.095; 
+      angle += 5.05 * dt; 
     }
   }
 
@@ -107,15 +125,16 @@ class icon {
   }
   
   void jump() {
-    if (ypos + h/2 >= height*2/3 - 1) {
-      ySpeed = 35; 
+    if (ypos >= 720 - h/2 - 2) {
+      ySpeed = jumpVelocity; 
     }
   }
 }
 
 class spike {
-  float xSpeed = 13;
+  float xSpeed = 850; 
   float xpos, ypos, w, h, origin;
+  
   spike (float x, float y, float w, float h) {
     this.xpos = x;
     this.origin = xpos;
@@ -123,29 +142,42 @@ class spike {
     this.w = w;
     this.h = h;
   }
-  void update() {
-    xpos -= xSpeed;
-    if (xpos < -50) {
-      xpos = 2000;
+  
+  void update(float dt) {
+    xpos -= xSpeed * dt;
+    if (xpos < -100) {
+      xpos = 2200; 
     }
   }
   
   void display() {
-    fill(255,0,0);
-    noStroke();
+    pushMatrix();
+    translate(xpos, ypos);
     rectMode(CENTER);
-    rect(xpos,ypos,w/4,h/2);
-    fill(0,0,0);
+    fill(255, 0, 0);
+    noStroke();
+    rect(0, 0, w/4, h/2);
+    
+    fill(0);
     stroke(255);
     strokeWeight(4);
-    triangle(xpos+(w/2),ypos+(h/2),xpos-(w/2),ypos+(h/2),xpos,ypos-(h/2));
-    
+    triangle(w/2, h/2, -w/2, h/2, 0, -h/2);
+    popMatrix();
   }
+  
   boolean collides(icon i) {
-    float dx = this.xpos - i.xpos;
-    float dy = this.ypos - i.ypos;
-    float rSpike = max(this.w/4.0, this.h/2.0) / 2.0; 
-    float rIcon  = max(i.w, i.h) / 2.0;
-    return dx*dx + dy*dy < (rSpike + rIcon)*(rSpike + rIcon);
+    float spikeLeft = this.xpos - (this.w / 3);
+    float spikeRight = this.xpos + (this.w / 3);
+    float spikeTop = this.ypos - (this.h / 2);
+    float spikeBottom = this.ypos + (this.h / 2);
+    
+    float iconLeft = i.xpos - (i.w / 2) + 10; 
+    float iconRight = i.xpos + (i.w / 2) - 10;
+    float iconTop = i.ypos - (i.h / 2) + 10;
+    float iconBottom = i.ypos + (i.h / 2) - 10;
+    
+    return (spikeLeft < iconRight && spikeRight > iconLeft &&
+            spikeTop < iconBottom && spikeBottom > iconTop);
   }
 }
+
