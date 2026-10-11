@@ -8,19 +8,22 @@ ArrayList<spike> spikes;
 float physicsInterval = 1.0 / 240.0; 
 float accumulator = 0.0;
 float currentTime = 0.0;
+float scaleFactor;
 
 void setup() {
-  size(1920, 1080);
+  fullScreen();
   background(100, 100, 100);
   
+  scaleFactor = width / 1920.0;
   currentTime = millis() / 1000.0;
   
-  cube = new icon(350, 667, 100, 100);
-  ground = new g(0, 2*height/3, width, height/3);
+  cube = new icon(350 * scaleFactor, (2 * height / 3) - (50 * scaleFactor), 100 * scaleFactor, 100 * scaleFactor);
+  ground = new g(0, 2 * height / 3, width, height / 3);
+  
   spikes = new ArrayList<spike>();
-  spikes.add(new spike(2000, 667, 100, 100));
-  spikes.add(new spike(2100, 667, 100, 100));
-  spikes.add(new spike(2200, 667, 100, 100));
+  spikes.add(new spike(2000 * scaleFactor, (2 * height / 3) - (50 * scaleFactor), 100 * scaleFactor, 100 * scaleFactor));
+  spikes.add(new spike(2100 * scaleFactor, (2 * height / 3) - (50 * scaleFactor), 100 * scaleFactor, 100 * scaleFactor));
+  spikes.add(new spike(2200 * scaleFactor, (2 * height / 3) - (50 * scaleFactor), 100 * scaleFactor, 100 * scaleFactor));
 }
 
 void draw() {
@@ -59,7 +62,7 @@ void updateGamePhysics(float dt) {
       gameEnd = false;
       respawn = 60;
       cube.angle = 0;
-      cube.ypos = 667;
+      cube.ypos = (2 * height / 3) - (cube.h / 2);
       cube.ySpeed = 0;
       for (spike s : spikes) {
         s.xpos = s.origin;
@@ -90,19 +93,21 @@ class icon {
   float xpos, ypos, w, h;
   float angle = 0; 
   
-  float gravity = 4500; 
-  float jumpVelocity = 1400; 
+  float gravity; 
+  float jumpVelocity; 
 
   icon(float x, float y, float w, float h) {
     this.xpos = x; this.ypos = y; this.w = w; this.h = h;
+    this.gravity = 4500 * scaleFactor;
+    this.jumpVelocity = 1400 * scaleFactor;
   }
 
   void update(float dt) {
     ySpeed -= gravity * dt;
     ypos -= ySpeed * dt;
 
-    if (ypos >= 720 - h/2) {
-      ypos = 720 - h/2;
+    if (ypos >= (2 * height / 3) - h/2) {
+      ypos = (2 * height / 3) - h/2;
       ySpeed = 0;
       angle = round(angle / PI) * PI; 
     } else {
@@ -117,22 +122,22 @@ class icon {
     rectMode(CENTER);
     fill(0, 200, 255);
     stroke(0);
-    strokeWeight(4);
+    strokeWeight(4 * scaleFactor);
     rect(0, 0, w, h);
     fill(100, 100, 100);
-    rect(0, 0, w - 40, h - 40);
+    rect(0, 0, w - (40 * scaleFactor), h - (40 * scaleFactor));
     popMatrix(); 
   }
   
   void jump() {
-    if (ypos >= 720 - h/2 - 2) {
+    if (ypos >= (2 * height / 3) - h/2 - (2 * scaleFactor)) {
       ySpeed = jumpVelocity; 
     }
   }
 }
 
 class spike {
-  float xSpeed = 850; 
+  float xSpeed; 
   float xpos, ypos, w, h, origin;
   
   spike (float x, float y, float w, float h) {
@@ -141,12 +146,13 @@ class spike {
     this.ypos = y;
     this.w = w;
     this.h = h;
+    this.xSpeed = 850 * scaleFactor;
   }
   
   void update(float dt) {
     xpos -= xSpeed * dt;
-    if (xpos < -100) {
-      xpos = 2200; 
+    if (xpos < -150 * scaleFactor) {
+      xpos = width + (280 * scaleFactor); 
     }
   }
   
@@ -160,7 +166,7 @@ class spike {
     
     fill(0);
     stroke(255);
-    strokeWeight(4);
+    strokeWeight(4 * scaleFactor);
     triangle(w/2, h/2, -w/2, h/2, 0, -h/2);
     popMatrix();
   }
@@ -171,13 +177,12 @@ class spike {
     float spikeTop = this.ypos - (this.h / 2);
     float spikeBottom = this.ypos + (this.h / 2);
     
-    float iconLeft = i.xpos - (i.w / 2) + 10; 
-    float iconRight = i.xpos + (i.w / 2) - 10;
-    float iconTop = i.ypos - (i.h / 2) + 10;
-    float iconBottom = i.ypos + (i.h / 2) - 10;
+    float iconLeft = i.xpos - (i.w / 2) + (10 * scaleFactor); 
+    float iconRight = i.xpos + (i.w / 2) - (10 * scaleFactor);
+    float iconTop = i.ypos - (i.h / 2) + (10 * scaleFactor);
+    float iconBottom = i.ypos + (i.h / 2) - (10 * scaleFactor);
     
     return (spikeLeft < iconRight && spikeRight > iconLeft &&
             spikeTop < iconBottom && spikeBottom > iconTop);
   }
 }
-
