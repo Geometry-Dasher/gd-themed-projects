@@ -10,20 +10,61 @@ float accumulator = 0.0;
 float currentTime = 0.0;
 float scaleFactor;
 
+float blockWidth;
+float lastSpawnX;
+int consecutiveSpikes = 0;
+int emptyBufferCount = 0;
+
 void setup() {
   fullScreen();
   background(100, 100, 100);
   
   scaleFactor = width / 1920.0;
+  blockWidth = 100 * scaleFactor;
   currentTime = millis() / 1000.0;
   
   cube = new icon(350 * scaleFactor, (2 * height / 3) - (50 * scaleFactor), 100 * scaleFactor, 100 * scaleFactor);
   ground = new g(0, 2 * height / 3, width, height / 3);
   
   spikes = new ArrayList<spike>();
-  spikes.add(new spike(2000 * scaleFactor, (2 * height / 3) - (50 * scaleFactor), 100 * scaleFactor, 100 * scaleFactor));
-  spikes.add(new spike(2100 * scaleFactor, (2 * height / 3) - (50 * scaleFactor), 100 * scaleFactor, 100 * scaleFactor));
-  spikes.add(new spike(2200 * scaleFactor, (2 * height / 3) - (50 * scaleFactor), 100 * scaleFactor, 100 * scaleFactor));
+  resetLevel();
+}
+
+void resetLevel() {
+  spikes.clear();
+  consecutiveSpikes = 0;
+  emptyBufferCount = 5; 
+  lastSpawnX = width;
+  
+  for (int i = 0; i < 15; i++) {
+    generateNextBlock();
+  }
+}
+
+void generateNextBlock() {
+  boolean spawnSpike = false;
+  
+  if (emptyBufferCount > 0) {
+    emptyBufferCount--;
+  } else if (consecutiveSpikes >= 3) {
+    consecutiveSpikes = 0;
+    emptyBufferCount = 5 - 1; 
+  } else {
+    float rand = random(1.0);
+    if (rand < 0.4) { 
+      spawnSpike = true;
+      consecutiveSpikes++;
+    } else {
+      consecutiveSpikes = 0;
+      emptyBufferCount = 5 - 1; 
+    }
+  }
+  
+  if (spawnSpike) {
+    spikes.add(new spike(lastSpawnX, (2 * height / 3) - (50 * scaleFactor), 100 * scaleFactor, 100 * scaleFactor));
+  }
+  
+  lastSpawnX += blockWidth;
 }
 
 void draw() {
@@ -50,12 +91,26 @@ void draw() {
 void updateGamePhysics(float dt) {
   if (!gameEnd) {
     cube.update(dt); 
-    for (spike s : spikes) {
+    
+    lastSpawnX -= 850 * scaleFactor * dt;
+    
+    for (int i = spikes.size() - 1; i >= 0; i--) {
+      spike s = spikes.get(i);
       s.update(dt);
+      
       if (s.collides(cube)) {
         gameEnd = true;
       }
+      
+      if (s.xpos < -150 * scaleFactor) {
+        spikes.remove(i);
+      }
     }
+    
+    while (lastSpawnX < width + 300 * scaleFactor) {
+      generateNextBlock();
+    }
+    
   } else {
     respawn--;
     if (respawn <= 0) {
@@ -64,9 +119,7 @@ void updateGamePhysics(float dt) {
       cube.angle = 0;
       cube.ypos = (2 * height / 3) - (cube.h / 2);
       cube.ySpeed = 0;
-      for (spike s : spikes) {
-        s.xpos = s.origin;
-      }
+      resetLevel();
     }
   }
 }
@@ -138,11 +191,10 @@ class icon {
 
 class spike {
   float xSpeed; 
-  float xpos, ypos, w, h, origin;
+  float xpos, ypos, w, h;
   
   spike (float x, float y, float w, float h) {
     this.xpos = x;
-    this.origin = xpos;
     this.ypos = y;
     this.w = w;
     this.h = h;
@@ -151,9 +203,6 @@ class spike {
   
   void update(float dt) {
     xpos -= xSpeed * dt;
-    if (xpos < -150 * scaleFactor) {
-      xpos = width + (280 * scaleFactor); 
-    }
   }
   
   void display() {
@@ -172,17 +221,42 @@ class spike {
   }
   
   boolean collides(icon i) {
-    float spikeLeft = this.xpos - (this.w / 3);
-    float spikeRight = this.xpos + (this.w / 3);
-    float spikeTop = this.ypos - (this.h / 2);
-    float spikeBottom = this.ypos + (this.h / 2);
-    
-    float iconLeft = i.xpos - (i.w / 2) + (10 * scaleFactor); 
-    float iconRight = i.xpos + (i.w / 2) - (10 * scaleFactor);
-    float iconTop = i.ypos - (i.h / 2) + (10 * scaleFactor);
-    float iconBottom = i.ypos + (i.h / 2) - (10 * scaleFactor);
-    
-    return (spikeLeft < iconRight && spikeRight > iconLeft &&
-            spikeTop < iconBottom && spikeBottom > iconTop);
+    float sLeft = this.xpos - (this.w / 6.0);
+    float sRight = this.xpos + (this.w / 6.0);
+    float sTop = this.ypos - (this.h / 4.0);
+    float sBottom = this.ypos + (this.h / 2);
+
+    float halfW = (i.w / 2.5);
+    float halfH = (i.h / 2.5);
+
+    float[][] origCorners = {
+      {-halfW, -halfH},
+      {halfW, -halfH},
+      {halfW, halfH},
+      {-halfW, halfH}
+    };
+
+    float cosA = cos(i.angle);
+    float sinA = sin(i.angle);
+    float[][] rotCorners = new float[4][2];
+
+    for (int j = 0; j < 4; j++) {
+      rotCorners[j][0] = i.xpos + (origCorners[j][0] * cosA - origCorners[j][1] * sinA);
+      rotCorners[j][1] = i.ypos + (origCorners[j][0] * sinA + origCorners[j][1] * cosA);
+    }
+
+    float cLeft = rotCorners[0][0];
+    float cRight = rotCorners[0][0];
+    float cTop = rotCorners[0][1];
+    float cBottom = rotCorners[0][1];
+
+    for (int j = 1; j < 4; j++) {
+      if (rotCorners[j][0] < cLeft) cLeft = rotCorners[j][0];
+      if (rotCorners[j][0] > cRight) cRight = rotCorners[j][0];
+      if (rotCorners[j][1] < cTop) cTop = rotCorners[j][1];
+      if (rotCorners[j][1] > cBottom) cBottom = rotCorners[j][1];
+    }
+
+    return (sLeft < cRight && sRight > cLeft && sTop < cBottom && sBottom > cTop);
   }
 }
